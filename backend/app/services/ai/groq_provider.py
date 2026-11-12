@@ -1,3 +1,10 @@
+"""Groq API provider for AI requirement conversations.
+
+Uses Groq's OpenAI-compatible chat completions endpoint for structured
+requirement extraction conversations. No API credentials are exposed to
+the frontend; all calls are made server-side.
+"""
+
 from contextlib import asynccontextmanager
 import json
 import logging
@@ -11,27 +18,55 @@ from app.core.config import Settings, get_settings
 from app.core.request_context import request_id_context
 from app.schemas.ai import AIProviderResponse, ConversationMessage, RequirementDraft
 from app.services.ai.base import (
+    AIProviderConfigurationError,
     AIProviderInvalidResponse,
     AIProviderResourceError,
     AIProviderTimeout,
     AIProviderUnavailable,
 )
-from app.services.ai.diagnostics import ollama_request_headers, provider_context
+from app.services.ai.diagnostics import provider_context
 
-logger = logging.getLogger("markettwin.ai.ollama")
+logger = logging.getLogger("markettwin.ai.groq")
 
-_REQUEST_TIMEOUT_SECONDS = 480.0
-_CONNECT_TIMEOUT_SECONDS = 5.0
+_REQUEST_TIMEOUT_SECONDS = 120.0
+_CONNECT_TIMEOUT_SECONDS = 10.0
+_TRANSLATION_TIMEOUT_SECONDS = 120.0
+_MATCH_EXPLANATION_TIMEOUT_SECONDS = 3.0
+_MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024
+_MAX_STRUCTURED_RESPONSE_ATTEMPTS = 2
 _shared_http_client: Optional[httpx.AsyncClient] = None
 
+# Groq models known to support JSON mode and structured conversation.
+# The configured GROQ_MODEL must be one of these or a Groq-supported
+# chat completion model that accepts response_format=json_object.
+GROQ_SUPPORTED_MODELS = {
+    "llama-3.1-8b-instant",
+    "llama-3.1-70b-versatile",
+    "llama-3.2-1b-preview",
+    "llama-3.2-3b-preview",
+    "mixtral-8x7b-32768",
+    "gemma-7b-it",
+}
 
-def initialize_ollama_http_client() -> None:
+
+def _validate_configured_model(model: str) -> None:
+    """Raise if the configured model is not a known Groq chat model."""
+    if model not in GROQ_SUPPORTED_MODELS:
+        raise AIProviderConfigurationError(
+            f"Configured Groq model '{model}' is not a supported Groq chat model. "
+            f"Supported models: {', '.join(sorted(GROQ_SUPPORTED_MODELS))}."
+        )
+
+
+def initialize_groq_http_client() -> None:
+    """Create the shared HTTPX client for Groq API calls."""
     global _shared_http_client
     if _shared_http_client is None or _shared_http_client.is_closed:
         _shared_http_client = httpx.AsyncClient()
 
 
-async def close_ollama_http_client() -> None:
+async def close_groq_http_client() -> None:
+    """Close the shared Groq HTTPX client."""
     global _shared_http_client
     client, _shared_http_client = _shared_http_client, None
     if client is not None and not client.is_closed:
@@ -40,7 +75,7 @@ async def close_ollama_http_client() -> None:
 
 def _shared_client() -> httpx.AsyncClient:
     if _shared_http_client is None or _shared_http_client.is_closed:
-        initialize_ollama_http_client()
+        initialize_groq_http_client()
     assert _shared_http_client is not None
     return _shared_http_client
 
@@ -79,7 +114,7 @@ def _log_conversation_failure(
     elapsed_ms = round((time.perf_counter() - started_at) * 1000)
     request_id = request_id_context.get()
     logger.warning(
-        "AI provider failure provider=ollama model=%s request_id=%s elapsed_ms=%d "
+        "AI provider failure provider=groq model=%s request_id=%s elapsed_ms=%d "
         "failure_category=%s phase=%s attempt=%d input_characters=%d",
         model,
         request_id,
@@ -89,7 +124,7 @@ def _log_conversation_failure(
         attempt,
         input_characters,
         extra={
-            "ai_provider": "ollama",
+            "ai_provider": "groq",
             "ai_model": model,
             "request_id": request_id,
             "elapsed_ms": elapsed_ms,
@@ -98,48 +133,6 @@ def _log_conversation_failure(
             "attempt": attempt,
             "input_characters": input_characters,
         },
-    )
-_TRANSLATION_TIMEOUT_SECONDS = 120.0
-_MATCH_EXPLANATION_TIMEOUT_SECONDS = 3.0
-_MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024
-_MAX_STRUCTURED_RESPONSE_ATTEMPTS = 2
-
-
-def _normalize_provider_response(payload: object) -> object:
-    if not isinstance(payload, dict):
-        return payload
-    draft = payload.get("requirement_draft")
-    if not isinstance(draft, dict):
-        return payload
-    normalized = dict(payload)
-    normalized["requirement_draft"] = RequirementDraft.model_validate(draft).model_dump()
-    return normalized
-
-
-def _validation_error_details(error: ValidationError) -> list[str]:
-    details = set()
-    for item in error.errors(include_input=False):
-        location = ".".join(str(part) for part in item["loc"]) or "response"
-        if not location.startswith("requirement_draft."):
-            location = f"requirement_draft.{location}"
-        details.add(f"{location}: {item['msg']}")
-    return sorted(details)
-
-
-def _retry_instruction(validation_details: list[str]) -> str:
-    errors = "\n".join(f"- {detail}" for detail in validation_details)
-    return (
-        "Your previous response failed structured response validation. Correct only the "
-        "invalid fields listed below, and preserve every other valid field and user-stated "
-        "fact unchanged. Return the complete response as one JSON object matching the "
-        "supplied schema. Use meaningful assistant_message text. Represent missing "
-        "constraint maps as empty objects and omit blank entries. Keep purchase quantity "
-        "and price information in commercial_constraints, genuine product specifications "
-        "in mandatory_requirements, and leave delivery_constraints empty unless delivery "
-        "was specified. Price amounts may include a currency symbol or scale; preserve "
-        "their exact numerical meaning and explicit currency. Do not invent missing price "
-        "bounds, currency, specifications, or delivery preferences.\n"
-        f"Validation errors to correct:\n{errors or '- Structured response was malformed.'}"
     )
 
 
@@ -154,30 +147,39 @@ async def _read_response_body(response: httpx.Response) -> bytes:
     return bytes(response_body)
 
 
-def _raise_for_ollama_error(
+def _raise_for_groq_error(
     response: httpx.Response,
     response_body: bytes,
     settings: Optional[Settings] = None,
 ) -> None:
+    """Map Groq HTTP errors to domain exceptions."""
     context = provider_context(settings) if settings is not None else "provider context unavailable"
+    if response.status_code == 401:
+        logger.warning("Groq returned HTTP 401; invalid API key (%s).", context)
+        raise AIProviderUnavailable("The AI provider is unavailable. Invalid API key.")
     if response.status_code == 404:
-        logger.warning(
-            "Ollama returned 404; the configured model may be unavailable (%s).",
-            context,
-        )
+        logger.warning("Groq returned HTTP 404; the configured model may be unavailable (%s).", context)
         raise AIProviderUnavailable("The configured AI model is unavailable.")
+    if response.status_code == 429:
+        logger.warning("Groq returned HTTP 429; rate limit exceeded (%s).", context)
+        raise AIProviderUnavailable("The AI provider is rate-limited. Please retry shortly.")
     if not response.is_error:
         return
 
     error_message = ""
     if response_body.strip():
         try:
-            error_message = str(json.loads(response_body).get("error", "") or "")
+            parsed = json.loads(response_body)
+            error_obj = parsed.get("error", {}) if isinstance(parsed, dict) else {}
+            if isinstance(error_obj, dict):
+                error_message = str(error_obj.get("message", "") or "")
+            elif isinstance(error_obj, str):
+                error_message = error_obj
         except (json.JSONDecodeError, AttributeError, TypeError):
             error_message = ""
 
     logger.warning(
-        "Ollama returned HTTP %s (%s): %s",
+        "Groq returned HTTP %s (%s): %s",
         response.status_code,
         context,
         error_message[:300],
@@ -185,12 +187,14 @@ def _raise_for_ollama_error(
 
     if any(
         marker in error_message.casefold()
-        for marker in ("unable to allocate", "failed to allocate", "out of memory")
+        for marker in ("rate limit", "quota", "too many requests")
     ):
-        raise AIProviderResourceError(
-            "Ollama could not load the local AI model because available memory is "
-            "insufficient. Close other memory-intensive applications, then retry."
-        )
+        raise AIProviderUnavailable("The AI provider is rate-limited. Please retry shortly.")
+    if any(
+        marker in error_message.casefold()
+        for marker in ("model", "not found", "decommissioned", "unsupported")
+    ):
+        raise AIProviderUnavailable("The configured AI model is unavailable.")
     raise AIProviderUnavailable("The AI provider is unavailable.")
 
 
@@ -279,8 +283,8 @@ class _MatchExplanation(BaseModel):
     explanation: str = Field(min_length=1, max_length=2000)
 
 
-class OllamaProvider:
-    """HTTPX adapter for Ollama's non-streaming chat API."""
+class GroqProvider:
+    """HTTPX adapter for Groq's OpenAI-compatible chat completions API."""
 
     def __init__(
         self,
@@ -289,8 +293,26 @@ class OllamaProvider:
     ) -> None:
         self._settings = settings or get_settings()
         self._transport = transport
+        _validate_configured_model(self._settings.GROQ_MODEL)
+        if not self._settings.GROQ_API_KEY or not self._settings.GROQ_API_KEY.strip():
+            raise AIProviderConfigurationError("Groq API key is not configured.")
+
+    @property
+    def _api_url(self) -> str:
+        return "https://api.groq.com/openai/v1/chat/completions"
+
+    @property
+    def _headers(self) -> dict[str, str]:
+        api_key = (self._settings.GROQ_API_KEY or "").strip()
+        if not api_key:
+            raise AIProviderConfigurationError("Groq API key is not configured.")
+        return {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
 
     async def translate_requirement(self, text: str, language: str) -> str:
+        """Translate a customer requirement from Tamil or Hindi to English."""
         system_prompt = """You are a professional multilingual translator for a B2B product marketplace.
 
 Translate the provided customer requirement into clear English.
@@ -319,12 +341,11 @@ Return only the English translation."""
                 timeout=timeout,
                 transport=self._transport,
             ) as client:
-                async with client.stream(
-                    "POST",
-                    f"{self._settings.OLLAMA_BASE_URL.rstrip('/')}/api/chat",
-                    headers=ollama_request_headers(self._settings),
+                response = await client.post(
+                    self._api_url,
+                    headers=self._headers,
                     json={
-                        "model": self._settings.OLLAMA_MODEL,
+                        "model": self._settings.GROQ_MODEL,
                         "messages": [
                             {"role": "system", "content": system_prompt},
                             {
@@ -336,13 +357,14 @@ Return only the English translation."""
                                 ),
                             },
                         ],
+                        "temperature": 0.1,
                         "stream": False,
-                        "think": False,
-                        "options": {"temperature": 0.1},
+                        "response_format": {"type": "json_object"},
                     },
-                ) as response:
-                    response_body = await _read_response_body(response)
-                    _raise_for_ollama_error(response, response_body, self._settings)
+                    timeout=timeout,
+                )
+                response_body = await _read_response_body(response)
+                _raise_for_groq_error(response, response_body, self._settings)
         except httpx.TimeoutException as exc:
             raise AIProviderTimeout("The AI translation provider timed out.") from exc
         except httpx.RequestError as exc:
@@ -350,15 +372,21 @@ Return only the English translation."""
 
         try:
             payload = json.loads(response_body)
-            content = payload["message"]["content"]
+            choices = payload.get("choices")
+            if not isinstance(choices, list) or not choices:
+                raise KeyError("No choices in Groq response")
+            message = choices[0].get("message")
+            if not isinstance(message, dict):
+                raise KeyError("No message in Groq response choice")
+            content = message.get("content")
         except (json.JSONDecodeError, KeyError, TypeError) as exc:
-            logger.warning("Ollama returned an invalid requirement translation response.")
+            logger.warning("Groq returned an invalid requirement translation response.")
             raise AIProviderInvalidResponse(
                 "The AI provider returned an invalid translation response.",
                 public_message="The requirement could not be translated. Please retry.",
             ) from exc
         if not isinstance(content, str) or not content.strip() or len(content) > 4000:
-            logger.warning("Ollama returned an empty or oversized requirement translation.")
+            logger.warning("Groq returned an empty or oversized requirement translation.")
             raise AIProviderInvalidResponse(
                 "The AI provider returned an invalid translation response.",
                 public_message="The requirement could not be translated. Please retry.",
@@ -372,7 +400,7 @@ Return only the English translation."""
         requirement_draft: RequirementDraft,
     ) -> AIProviderResponse:
         started_at = time.perf_counter()
-        ollama_messages = [
+        groq_messages = [
             {
                 "role": "system",
                 "content": (
@@ -389,7 +417,7 @@ Return only the English translation."""
             ),
             {"role": "user", "content": message},
         ]
-        input_characters = sum(len(item["content"]) for item in ollama_messages)
+        input_characters = sum(len(item["content"]) for item in groq_messages)
         timeout = httpx.Timeout(
             _REQUEST_TIMEOUT_SECONDS,
             connect=_CONNECT_TIMEOUT_SECONDS,
@@ -399,20 +427,19 @@ Return only the English translation."""
             attempt_started_at = time.perf_counter()
             phase = "connection_or_response_headers"
             request_payload = {
-                "model": self._settings.OLLAMA_MODEL,
-                "messages": ollama_messages,
-                "format": AIProviderResponse.model_json_schema(),
+                "model": self._settings.GROQ_MODEL,
+                "messages": groq_messages,
+                "temperature": 0.1,
                 "stream": False,
-                "think": False,
-                "options": {"temperature": 0.1},
+                "response_format": {"type": "json_object"},
             }
             logger.info(
-                "Ollama request started provider=ollama model=%s request_id=%s attempt=%d "
+                "Groq request started provider=groq model=%s request_id=%s attempt=%d "
                 "message_count=%d input_characters=%d payload_characters=%d stream=false",
-                self._settings.OLLAMA_MODEL,
+                self._settings.GROQ_MODEL,
                 request_id_context.get(),
                 attempt + 1,
-                len(ollama_messages),
+                len(groq_messages),
                 input_characters,
                 len(json.dumps(request_payload, ensure_ascii=False)),
             )
@@ -420,27 +447,27 @@ Return only the English translation."""
                 async with _request_client(self._transport) as client:
                     async with client.stream(
                         "POST",
-                        f"{self._settings.OLLAMA_BASE_URL.rstrip('/')}/api/chat",
-                        headers=ollama_request_headers(self._settings),
+                        self._api_url,
+                        headers=self._headers,
                         json=request_payload,
                         timeout=timeout,
                     ) as response:
                         phase = "response_body"
                         response_body = await _read_response_body(response)
                         logger.info(
-                            "Ollama response received provider=ollama model=%s request_id=%s "
+                            "Groq response received provider=groq model=%s request_id=%s "
                             "elapsed_ms=%d status_code=%d response_bytes=%d input_characters=%d",
-                            self._settings.OLLAMA_MODEL,
+                            self._settings.GROQ_MODEL,
                             request_id_context.get(),
                             round((time.perf_counter() - attempt_started_at) * 1000),
                             response.status_code,
                             len(response_body),
                             input_characters,
                         )
-                        _raise_for_ollama_error(response, response_body, self._settings)
+                        _raise_for_groq_error(response, response_body, self._settings)
             except httpx.TimeoutException as exc:
                 _log_conversation_failure(
-                    self._settings.OLLAMA_MODEL,
+                    self._settings.GROQ_MODEL,
                     attempt_started_at,
                     _timeout_failure_category(exc),
                     phase,
@@ -450,7 +477,7 @@ Return only the English translation."""
                 raise AIProviderTimeout("The AI provider timed out.") from exc
             except httpx.RequestError as exc:
                 _log_conversation_failure(
-                    self._settings.OLLAMA_MODEL,
+                    self._settings.GROQ_MODEL,
                     attempt_started_at,
                     "connection_failure",
                     phase,
@@ -460,7 +487,7 @@ Return only the English translation."""
                 raise AIProviderUnavailable("The AI provider is unavailable.") from exc
             except AIProviderResourceError:
                 _log_conversation_failure(
-                    self._settings.OLLAMA_MODEL,
+                    self._settings.GROQ_MODEL,
                     attempt_started_at,
                     "provider_resource_error",
                     phase,
@@ -470,7 +497,7 @@ Return only the English translation."""
                 raise
             except AIProviderUnavailable:
                 _log_conversation_failure(
-                    self._settings.OLLAMA_MODEL,
+                    self._settings.GROQ_MODEL,
                     attempt_started_at,
                     "provider_unavailable",
                     phase,
@@ -480,7 +507,7 @@ Return only the English translation."""
                 raise
             except AIProviderInvalidResponse:
                 _log_conversation_failure(
-                    self._settings.OLLAMA_MODEL,
+                    self._settings.GROQ_MODEL,
                     attempt_started_at,
                     "invalid_response",
                     phase,
@@ -492,10 +519,16 @@ Return only the English translation."""
             validation_details: list[str] = []
             try:
                 provider_payload = json.loads(response_body)
-                content = provider_payload["message"]["content"]
+                choices = provider_payload.get("choices")
+                if not isinstance(choices, list) or not choices:
+                    raise KeyError("No choices in Groq response")
+                message_obj = choices[0].get("message")
+                if not isinstance(message_obj, dict):
+                    raise KeyError("No message in Groq response choice")
+                content = message_obj.get("content")
                 if not isinstance(content, str) or not content.strip():
                     raise ValueError("Empty model response.")
-                parsed = _normalize_provider_response(json.loads(content))
+                parsed = json.loads(content)
                 return AIProviderResponse.model_validate(parsed)
             except (KeyError, TypeError, ValueError, json.JSONDecodeError, ValidationError) as exc:
                 if isinstance(exc, ValidationError):
@@ -511,16 +544,16 @@ Return only the English translation."""
                     failure = "empty or invalid structured content"
                 elapsed_ms = round((time.perf_counter() - started_at) * 1000)
                 logger.warning(
-                    "Ollama returned invalid structured response (provider=ollama model=%s attempt=%s/%s "
+                    "Groq returned invalid structured response (provider=groq model=%s attempt=%s/%s "
                     "elapsed_ms=%s failure_category=invalid_response; %s).",
-                    self._settings.OLLAMA_MODEL,
+                    self._settings.GROQ_MODEL,
                     attempt + 1,
                     _MAX_STRUCTURED_RESPONSE_ATTEMPTS,
                     elapsed_ms,
                     failure,
                     extra={
-                        "ai_provider": "ollama",
-                        "ai_model": self._settings.OLLAMA_MODEL,
+                        "ai_provider": "groq",
+                        "ai_model": self._settings.GROQ_MODEL,
                         "elapsed_ms": elapsed_ms,
                         "failure_category": "invalid_response",
                         "phase": "response_validation",
@@ -540,16 +573,16 @@ Return only the English translation."""
                         "The AI provider returned an invalid structured response.",
                         public_message=public_message,
                     ) from exc
-                ollama_messages = [
+                groq_messages = [
                     {
-                        **ollama_messages[0],
+                        **groq_messages[0],
                         "content": (
-                            ollama_messages[0]["content"]
+                            groq_messages[0]["content"]
                             + "\n\n"
                             + _retry_instruction(validation_details)
                         ),
                     },
-                    *ollama_messages[1:],
+                    *groq_messages[1:],
                 ]
 
     async def explain_product_matches(self, evidence: dict[str, object]) -> str:
@@ -563,12 +596,11 @@ Return only the English translation."""
                 timeout=timeout,
                 transport=self._transport,
             ) as client:
-                async with client.stream(
-                    "POST",
-                    f"{self._settings.OLLAMA_BASE_URL.rstrip('/')}/api/chat",
-                    headers=ollama_request_headers(self._settings),
+                response = await client.post(
+                    self._api_url,
+                    headers=self._headers,
                     json={
-                        "model": self._settings.OLLAMA_MODEL,
+                        "model": self._settings.GROQ_MODEL,
                         "messages": [
                             {"role": "system", "content": _MATCH_EXPLANATION_PROMPT},
                             {
@@ -576,13 +608,14 @@ Return only the English translation."""
                                 "content": json.dumps(evidence, ensure_ascii=False),
                             },
                         ],
-                        "format": _MatchExplanation.model_json_schema(),
+                        "response_format": {"type": "json_object"},
+                        "temperature": 0.1,
                         "stream": False,
-                        "options": {"temperature": 0.1},
                     },
-                ) as response:
-                    response_body = await _read_response_body(response)
-                    _raise_for_ollama_error(response, response_body, self._settings)
+                    timeout=timeout,
+                )
+                response_body = await _read_response_body(response)
+                _raise_for_groq_error(response, response_body, self._settings)
         except httpx.TimeoutException as exc:
             raise AIProviderTimeout("The AI provider timed out.") from exc
         except httpx.RequestError as exc:
@@ -590,11 +623,44 @@ Return only the English translation."""
 
         try:
             provider_payload = json.loads(response_body)
-            content = provider_payload["message"]["content"]
+            choices = provider_payload.get("choices")
+            if not isinstance(choices, list) or not choices:
+                raise KeyError("No choices in Groq response")
+            message_obj = choices[0].get("message")
+            if not isinstance(message_obj, dict):
+                raise KeyError("No message in Groq response choice")
+            content = message_obj.get("content")
             if not isinstance(content, str) or not content.strip():
                 raise ValueError("Empty model response.")
             parsed = json.loads(content)
             return _MatchExplanation.model_validate(parsed).explanation.strip()
         except (KeyError, TypeError, ValueError, json.JSONDecodeError, ValidationError) as exc:
-            logger.warning("Ollama returned an invalid product matching explanation.")
+            logger.warning("Groq returned an invalid product matching explanation.")
             raise AIProviderInvalidResponse("The AI provider returned an invalid response.") from exc
+
+
+def _validation_error_details(error: ValidationError) -> list[str]:
+    details = set()
+    for item in error.errors(include_input=False):
+        location = ".".join(str(part) for part in item["loc"]) or "response"
+        if not location.startswith("requirement_draft."):
+            location = f"requirement_draft.{location}"
+        details.add(f"{location}: {item['msg']}")
+    return sorted(details)
+
+
+def _retry_instruction(validation_details: list[str]) -> str:
+    errors = "\n".join(f"- {detail}" for detail in validation_details)
+    return (
+        "Your previous response failed structured response validation. Correct only the "
+        "invalid fields listed below, and preserve every other valid field and user-stated "
+        "fact unchanged. Return the complete response as one JSON object matching the "
+        "supplied schema. Use meaningful assistant_message text. Represent missing "
+        "constraint maps as empty objects and omit blank entries. Keep purchase quantity "
+        "and price information in commercial_constraints, genuine product specifications "
+        "in mandatory_requirements, and leave delivery_constraints empty unless delivery "
+        "was specified. Price amounts may include a currency symbol or scale; preserve "
+        "their exact numerical meaning and explicit currency. Do not invent missing price "
+        "bounds, currency, specifications, or delivery preferences.\n"
+        f"Validation errors to correct:\n{errors or '- Structured response was malformed.'}"
+    )

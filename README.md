@@ -110,22 +110,16 @@ FRONTEND_URL="http://localhost:5173"
 
 GROQ_API_KEY="your-groq-api-key"
 
-AI_PROVIDER="ollama"
-OLLAMA_BASE_URL="http://localhost:11434"
-OLLAMA_MODEL="qwen3.5:4b"
+AI_PROVIDER="groq"
+GROQ_MODEL="llama-3.1-8b-instant"
+GROQ_HEALTH_TIMEOUT_SECONDS=2
 
 PAYPAL_CLIENT_ID="your-paypal-client-id"
 PAYPAL_CLIENT_SECRET="your-paypal-client-secret"
 PAYPAL_MODE="sandbox"
 ```
 
-For local AI conversations, run Ollama on the same machine as the backend and pull
-the configured model (`ollama pull qwen3.5:4b`). The backend
-calls Ollama at the configured base URL; do not expose Ollama's port publicly.
-The anonymous conversation endpoint is `POST /api/v1/ai/conversation`. It does
-not save conversations or create demands. A hosted backend such as Render cannot
-reach your computer through its own `localhost`; production inference needs a
-provider reachable from that backend.
+For local AI conversations, set `GROQ_API_KEY` to your Groq API key and `GROQ_MODEL` to a supported Groq chat model (e.g., `llama-3.1-8b-instant`). The backend calls the Groq API server-side; no API key is exposed to the frontend. The anonymous conversation endpoint is `POST /api/v1/ai/conversation`. It does not save conversations or create demands.
 
 Run migrations:
 

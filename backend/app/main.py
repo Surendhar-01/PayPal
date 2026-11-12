@@ -22,7 +22,7 @@ from app.core.supabase import check_supabase_health
 from app.services.ai.diagnostics import (
     loopback_in_deployed_environment,
     provider_context,
-    safe_ollama_base_url,
+    safe_groq_base_url,
 )
 
 # Configure Logging
@@ -44,27 +44,17 @@ async def lifespan(app: FastAPI):
     logger.info(f"AI target: {provider_context(settings)}")
     if loopback_in_deployed_environment(settings):
         logger.warning(
-            "OLLAMA_BASE_URL targets loopback (%s) while ENVIRONMENT=%s. A deployed "
-            "backend cannot reach the host machine's Ollama; AI conversations will "
+            "Groq is reachable only through a loopback address (%s) while ENVIRONMENT=%s. A deployed "
+            "backend cannot reach the host machine's AI provider; AI conversations will "
             "return 503 until a reachable endpoint is configured.",
-            safe_ollama_base_url(settings.OLLAMA_BASE_URL),
+            safe_groq_base_url(settings.GROQ_API_KEY or ""),
             settings.ENVIRONMENT,
         )
     db_status, db_msg = check_supabase_health()
     logger.info(f"Supabase Status: {db_status} ({db_msg})")
     logger.info("=" * 60)
-    if settings.AI_PROVIDER.strip().lower() == "ollama":
-        from app.services.ai.ollama_provider import initialize_ollama_http_client
-
-        initialize_ollama_http_client()
-    try:
-        yield
-    finally:
-        if settings.AI_PROVIDER.strip().lower() == "ollama":
-            from app.services.ai.ollama_provider import close_ollama_http_client
-
-            await close_ollama_http_client()
-        logger.info(f"Shutting down {settings.PROJECT_NAME}...")
+    yield
+    logger.info(f"Shutting down {settings.PROJECT_NAME}...")
 
 
 def create_application() -> FastAPI:

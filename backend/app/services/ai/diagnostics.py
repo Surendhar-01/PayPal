@@ -14,7 +14,7 @@ _LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1", "0.0.0.0"}
 _LOCAL_ENVIRONMENTS = {"development", "dev", "local", "test", "testing"}
 
 
-def safe_ollama_base_url(base_url: str) -> str:
+def safe_groq_base_url(base_url: str) -> str:
     """Return ``scheme://host[:port]`` without userinfo, path, or query."""
     raw = (base_url or "").strip()
     if not raw:
@@ -39,9 +39,9 @@ def is_loopback_url(base_url: str) -> bool:
     return (host or "").lower() in _LOOPBACK_HOSTS
 
 
-def ollama_request_headers(settings: Settings) -> Dict[str, str]:
-    """Build request headers, including optional bearer authentication."""
-    api_key = (settings.OLLAMA_API_KEY or "").strip()
+def groq_request_headers(settings: Settings) -> Dict[str, str]:
+    """Build request headers, including bearer authentication."""
+    api_key = (settings.GROQ_API_KEY or "").strip()
     if not api_key:
         return {}
     return {"Authorization": f"Bearer {api_key}"}
@@ -50,15 +50,10 @@ def ollama_request_headers(settings: Settings) -> Dict[str, str]:
 def provider_context(settings: Settings) -> str:
     """A log-safe summary of the configured AI provider target."""
     provider = (settings.AI_PROVIDER or "").strip().lower() or "unset"
-    model = (settings.OLLAMA_MODEL or "").strip() or "<unset>"
-    base = safe_ollama_base_url(settings.OLLAMA_BASE_URL)
-    return f"provider={provider}, model={model}, base={base}"
+    model = (settings.GROQ_MODEL or "").strip() or "<unset>"
+    return f"provider={provider}, model={model}"
 
 
 def loopback_in_deployed_environment(settings: Settings) -> bool:
-    """True when a deployed backend is pointed at an unreachable loopback address."""
-    environment = (settings.ENVIRONMENT or "").strip().lower()
-    return (
-        environment not in _LOCAL_ENVIRONMENTS
-        and is_loopback_url(settings.OLLAMA_BASE_URL)
-    )
+    """Groq uses a fixed remote API URL, so loopback never applies."""
+    return False

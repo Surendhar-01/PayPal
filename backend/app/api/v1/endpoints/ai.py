@@ -21,7 +21,6 @@ from app.services.ai.base import (
     AIProviderUnavailable,
 )
 from app.services.ai.conversation_service import ConversationService
-from app.services.ai.ollama_provider import OllamaProvider
 
 router = APIRouter()
 logger = logging.getLogger("markettwin.ai.conversation")
@@ -133,7 +132,7 @@ async def continue_conversation(request: Request) -> AIConversationResponse:
         + sum(len(item.content) for item in payload.conversation_history)
         + len(json.dumps(draft, ensure_ascii=False))
     )
-    model = settings.OLLAMA_MODEL if settings.AI_PROVIDER.strip().lower() == "ollama" else "unknown"
+    model = settings.GROQ_MODEL if settings.AI_PROVIDER.strip().lower() == "groq" else "unknown"
     request.state.ai_trace = {
         "provider": settings.AI_PROVIDER,
         "model": model,
@@ -215,10 +214,6 @@ async def translate_requirement(
 
     try:
         provider = create_ai_provider()
-        if not isinstance(provider, OllamaProvider):
-            raise AIProviderConfigurationError(
-                "Requirement translation requires the configured Ollama provider."
-            )
         translated_text = await provider.translate_requirement(
             payload.text,
             payload.language,

@@ -9,15 +9,6 @@ from app.services.demand_compatibility import (
     assess_demand_grouping_readiness,
     assess_group_compatibility,
 )
-from app.services.demand_embedding_service import (
-    DemandEmbeddingService,
-    DemandEmbeddingResult,
-    build_embedding_input,
-    calculate_embedding_input_hash,
-    get_demand_embedding,
-    persist_demand_embedding,
-    search_demand_embedding_candidates,
-)
 from app.services.demand_family_taxonomy import canonical_demand_family
 from app.services.demand_normalization import normalize_demand_v2
 
@@ -169,53 +160,10 @@ async def try_group_new_demand(demand: Mapping[str, Any], client: Any) -> dict[s
         str(demand.get("category") or ""),
     )
 
-    embedding_demand = {
-        **demand,
-        "product_name": demand.get("title") or demand.get("product_name"),
-    }
-    try:
-        settings = get_settings()
-        expected_hash = calculate_embedding_input_hash(
-            build_embedding_input(embedding_demand),
-            settings.OLLAMA_EMBEDDING_VERSION,
-        )
-        stored_embedding = get_demand_embedding(demand_id, client=client)
-        if (
-            stored_embedding is not None
-            and stored_embedding.embedding_model == settings.OLLAMA_EMBEDDING_MODEL
-            and stored_embedding.embedding_version == settings.OLLAMA_EMBEDDING_VERSION
-            and stored_embedding.input_hash == expected_hash
-        ):
-            embedding = DemandEmbeddingResult(
-                embedding=stored_embedding.embedding,
-                embedding_model=stored_embedding.embedding_model,
-                embedding_version=stored_embedding.embedding_version,
-                input_hash=stored_embedding.input_hash,
-            )
-            embedding_is_stored = True
-        else:
-            embedding = await DemandEmbeddingService().generate(embedding_demand)
-            embedding_is_stored = False
-    except Exception as exc:
-        logger.warning("Demand embedding read or generation failed (%s).", type(exc).__name__)
-        return _record_review(client, demand_id, customer_id, "compatibility_assessment_failed")
-    if not embedding_is_stored:
-        try:
-            persist_demand_embedding(demand_id, embedding, client=client)
-        except Exception as exc:
-            logger.warning("Demand embedding persistence failed (%s).", type(exc).__name__)
-            return _record_review(client, demand_id, customer_id, "compatibility_assessment_failed")
-    try:
-        semantic_candidates = search_demand_embedding_candidates(
-            embedding.embedding,
-            embedding_model=embedding.embedding_model,
-            embedding_version=embedding.embedding_version,
-            exclude_demand_id=demand_id,
-            client=client,
-        )
-    except Exception as exc:
-        logger.warning("Semantic candidate search for demand %s failed (%s).", demand_id, type(exc).__name__)
-        return _record_review(client, demand_id, customer_id, "compatibility_assessment_failed")
+    # Demand embeddings are disabled without Ollama. Semantic candidate
+    # search is skipped; exact taxonomy matching is used instead.
+    semantic_candidates: list[Any] = []
+
     if canonical is None:
         return dict(demand)
 

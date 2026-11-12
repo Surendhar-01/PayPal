@@ -55,43 +55,16 @@ class Settings(BaseSettings):
     )
     FRONTEND_URL: str = Field(default="http://localhost:5173", description="Frontend base URL for auth redirects")
     GROQ_API_KEY: str = Field(default="", description="Groq API key for AI features")
-    AI_PROVIDER: str = Field(default="ollama", description="AI provider used for requirement conversations")
-    OLLAMA_BASE_URL: str = Field(default="http://localhost:11434", description="Ollama API base URL")
-    OLLAMA_MODEL: str = Field(
-        default="qwen3.5:4b",
-        description="Ollama model used for AI features",
+    GROQ_MODEL: str = Field(
+        default="llama-3.1-8b-instant",
+        description="Groq chat completion model used for AI conversations",
     )
-    OLLAMA_API_KEY: str = Field(
-        default="",
-        description=(
-            "Optional bearer token for an authenticated Ollama endpoint. Leave empty for "
-            "a trusted network-local Ollama instance that requires no authentication."
-        ),
-    )
-    OLLAMA_HEALTH_TIMEOUT_SECONDS: float = Field(
+    AI_PROVIDER: str = Field(default="groq", description="AI provider used for requirement conversations")
+    GROQ_HEALTH_TIMEOUT_SECONDS: float = Field(
         default=2.0,
         gt=0,
         le=10,
-        description="Timeout for the Ollama dependency probe used by the health endpoint",
-    )
-    OLLAMA_EMBEDDING_BASE_URL: str = Field(
-        default="http://localhost:11434",
-        description="Ollama API base URL used for demand embeddings",
-    )
-    OLLAMA_EMBEDDING_MODEL: str = Field(
-        default="nomic-embed-text",
-        description="Ollama model used for demand embeddings",
-    )
-    OLLAMA_EMBEDDING_VERSION: str = Field(
-        default="v1",
-        min_length=1,
-        description="Version of the demand embedding input format",
-    )
-    OLLAMA_EMBEDDING_TIMEOUT_SECONDS: float = Field(
-        default=30.0,
-        gt=0,
-        le=300,
-        description="Timeout for Ollama demand embedding requests",
+        description="Timeout for the Groq dependency probe used by the health endpoint",
     )
     BUYORA_CATALOGUE_API_URL: str = Field(
         default="https://buyora-backend-0kae.onrender.com/api/products",

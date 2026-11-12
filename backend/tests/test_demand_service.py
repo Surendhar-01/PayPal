@@ -254,11 +254,6 @@ async def test_retry_of_already_grouped_submission_skips_regrouping(monkeypatch)
     }
     client = Client({"updated_demand": saved})
     monkeypatch.setattr(demand_service, "get_supabase_service_client", lambda: client)
-    monkeypatch.setattr(
-        demand_group_submission_service,
-        "DemandEmbeddingService",
-        lambda: pytest.fail("A grouped submission retry must not regenerate an embedding."),
-    )
 
     result = await demand_service.create_demand(
         "customer-1",

@@ -20,7 +20,7 @@ from app.services.ai.base import (
     AIProviderTimeout,
     AIProviderUnavailable,
 )
-from app.services.ai.ollama_provider import OllamaProvider
+from app.services.ai.groq_provider import GroqProvider
 from app.services.buyora_catalogue_service import (
     BuyoraCatalogueService,
     CatalogueProduct,
@@ -280,12 +280,12 @@ class ProductMatchingService:
     def __init__(
         self,
         catalogue_service: Optional[BuyoraCatalogueService] = None,
-        explanation_provider: Optional[OllamaProvider] = None,
+        explanation_provider: Optional[Any] = None,
         settings: Optional[Settings] = None,
     ) -> None:
         self._settings = settings or get_settings()
         self._catalogue_service = catalogue_service or BuyoraCatalogueService(self._settings)
-        self._explanation_provider = explanation_provider or OllamaProvider(self._settings)
+        self._explanation_provider = explanation_provider or GroqProvider(self._settings)
 
     async def match(
         self,
@@ -363,7 +363,7 @@ class ProductMatchingService:
         explanation_elapsed_ms = 0
         if candidates and include_ai_explanation:
             explanation_started = time.perf_counter()
-            explanation = await self._explain_with_ollama(
+            explanation = await self._explain_with_groq(
                 draft,
                 exact[:MAX_AI_EXPLANATION_PRODUCTS],
                 near[:MAX_AI_EXPLANATION_PRODUCTS],
@@ -420,7 +420,7 @@ class ProductMatchingService:
             explanation=explanation,
         )
 
-    async def _explain_with_ollama(
+    async def _explain_with_groq(
         self,
         draft: RequirementDraft,
         exact: Sequence[_Candidate],

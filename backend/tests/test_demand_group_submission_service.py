@@ -2,20 +2,12 @@ import pytest
 
 from app.services import demand_group_submission_service as grouping_service
 from app.services.demand_compatibility import CompatibilityAssessment
-from app.services.demand_embedding_service import (
-    EMBEDDING_DIMENSIONS,
-    DemandEmbeddingCandidate,
-    DemandEmbeddingResult,
-    StoredDemandEmbedding,
-    build_embedding_input,
-    calculate_embedding_input_hash,
-)
 from app.services.demand_group_submission_service import try_group_new_demand
 
 
 class _EmbeddingHarness:
     def __init__(self):
-        self.candidates = [DemandEmbeddingCandidate("existing-demand", 0.1, 0.9)]
+        self.candidates = []
         self.generate_error = None
         self.persist_error = None
         self.search_error = None
@@ -30,12 +22,7 @@ class _EmbeddingHarness:
         self.generate_calls.append(demand)
         if self.generate_error:
             raise self.generate_error
-        return DemandEmbeddingResult(
-            embedding=[0.25] * EMBEDDING_DIMENSIONS,
-            embedding_model="nomic-embed-text",
-            embedding_version="v1",
-            input_hash="hash-a",
-        )
+        return None
 
     def persist(self, demand_id, embedding, client=None):
         self.events.append("persist")
@@ -55,18 +42,9 @@ class _EmbeddingHarness:
 @pytest.fixture
 def embeddings(monkeypatch):
     harness = _EmbeddingHarness()
-    monkeypatch.setattr(grouping_service, "DemandEmbeddingService", lambda: harness)
-    monkeypatch.setattr(
-        grouping_service,
-        "get_demand_embedding",
-        lambda demand_id, client=None: (
-            harness.read_calls.append(demand_id),
-            harness.events.append("read"),
-            None,
-        )[-1],
-    )
-    monkeypatch.setattr(grouping_service, "persist_demand_embedding", harness.persist)
-    monkeypatch.setattr(grouping_service, "search_demand_embedding_candidates", harness.search)
+    # Demand embeddings are disabled without Ollama. The harness is kept
+    # as a no-op placeholder; try_group_new_demand no longer calls embedding
+    # functions.
     return harness
 
 
@@ -660,9 +638,9 @@ async def test_reviewed_headphone_category_retries_through_strict_grouping(embed
 
     assert result["grouping_status"] == "grouped"
     assert result["group_id"] == "group-1"
-    assert len(embeddings.generate_calls) == 1
-    assert embeddings.persist_calls[0][0] == "new-demand"
-    assert embeddings.search_calls[0][1]["exclude_demand_id"] == "new-demand"
+    assert embeddings.generate_calls == []
+    assert embeddings.persist_calls == []
+    assert embeddings.search_calls == []
     assert [assessment.status for assessment in assessments] == ["compatible"]
     family_call = next(
         params for name, params in client.rpc_calls
@@ -680,40 +658,16 @@ async def test_reviewed_headphone_category_retries_through_strict_grouping(embed
 
 
 @pytest.mark.anyio
-async def test_valid_stored_embedding_is_reused_without_generation_or_write(embeddings, monkeypatch):
-    from app.core.config import get_settings
-
+async def test_grouping_skips_embedding_when_disabled(embeddings, monkeypatch):
     client, demand = _candidate_client()
-    normalized_source = client.rows["demand_normalized_requirements"][0]
-    embedding_input = {
-        **demand,
-        "product_name": demand["title"],
-        "product_type": normalized_source["product_type"],
-        "normalized_requirements": normalized_source,
-    }
-    settings = get_settings()
-    stored = StoredDemandEmbedding(
-        embedding=[0.5] * EMBEDDING_DIMENSIONS,
-        embedding_model=settings.OLLAMA_EMBEDDING_MODEL,
-        embedding_version=settings.OLLAMA_EMBEDDING_VERSION,
-        input_hash=calculate_embedding_input_hash(
-            build_embedding_input(embedding_input),
-            settings.OLLAMA_EMBEDDING_VERSION,
-        ),
-    )
-    monkeypatch.setattr(
-        grouping_service,
-        "get_demand_embedding",
-        lambda demand_id, client=None: (embeddings.events.append("read"), stored)[1],
-    )
 
     result = await try_group_new_demand(demand, client)
 
     assert result["grouping_status"] == "grouped"
-    assert embeddings.events == ["read", "search"]
     assert embeddings.generate_calls == []
     assert embeddings.persist_calls == []
-    assert embeddings.search_calls[0][0] == stored.embedding
+    assert embeddings.search_calls == []
+    assert embeddings.read_calls == []
 
 
 @pytest.mark.anyio
