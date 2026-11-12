@@ -36,28 +36,6 @@ _MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024
 _MAX_STRUCTURED_RESPONSE_ATTEMPTS = 2
 _shared_http_client: Optional[httpx.AsyncClient] = None
 
-# Groq models known to support JSON mode and structured conversation.
-# The configured GROQ_MODEL must be one of these or a Groq-supported
-# chat completion model that accepts response_format=json_object.
-GROQ_SUPPORTED_MODELS = {
-    "llama-3.1-8b-instant",
-    "llama-3.1-70b-versatile",
-    "llama-3.2-1b-preview",
-    "llama-3.2-3b-preview",
-    "mixtral-8x7b-32768",
-    "gemma-7b-it",
-}
-
-
-def _validate_configured_model(model: str) -> None:
-    """Raise if the configured model is not a known Groq chat model."""
-    if model not in GROQ_SUPPORTED_MODELS:
-        raise AIProviderConfigurationError(
-            f"Configured Groq model '{model}' is not a supported Groq chat model. "
-            f"Supported models: {', '.join(sorted(GROQ_SUPPORTED_MODELS))}."
-        )
-
-
 def initialize_groq_http_client() -> None:
     """Create the shared HTTPX client for Groq API calls."""
     global _shared_http_client
@@ -293,7 +271,6 @@ class GroqProvider:
     ) -> None:
         self._settings = settings or get_settings()
         self._transport = transport
-        _validate_configured_model(self._settings.GROQ_MODEL)
         if not self._settings.GROQ_API_KEY or not self._settings.GROQ_API_KEY.strip():
             raise AIProviderConfigurationError("Groq API key is not configured.")
 

@@ -208,14 +208,6 @@ async def test_groq_404_model_unavailable():
 
 
 @pytest.mark.anyio
-async def test_groq_invalid_model_configuration():
-    with pytest.raises(AIProviderConfigurationError):
-        GroqProvider(
-            Settings(_env_file=None, AI_PROVIDER="groq", GROQ_API_KEY="gsk_test-key", GROQ_MODEL="invalid-model")
-        )
-
-
-@pytest.mark.anyio
 async def test_groq_missing_api_key():
     with pytest.raises(AIProviderConfigurationError):
         GroqProvider(
