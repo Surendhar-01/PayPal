@@ -202,100 +202,103 @@ ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 
 -- Policies: user_roles
 DROP POLICY IF EXISTS user_roles_select ON public.user_roles;
-CREATE POLICY user_roles_select ON public.user_roles FOR SELECT USING (user_id = auth.uid() OR public.is_admin());
+CREATE POLICY user_roles_select ON public.user_roles FOR SELECT USING (user_id = auth.uid());
 DROP POLICY IF EXISTS user_roles_write ON public.user_roles;
-CREATE POLICY user_roles_write ON public.user_roles FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
 
--- categories (public read, admin write)
+-- categories (public read)
 DROP POLICY IF EXISTS categories_select ON public.categories;
 CREATE POLICY categories_select ON public.categories FOR SELECT USING (TRUE);
 DROP POLICY IF EXISTS categories_write ON public.categories;
 CREATE POLICY categories_write ON public.categories FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
 
 -- product_images (public read, admin write)
+-- product_images (public read)
 DROP POLICY IF EXISTS product_images_select ON public.product_images;
 CREATE POLICY product_images_select ON public.product_images FOR SELECT USING (TRUE);
-DROP POLICY IF EXISTS product_images_write ON public.product_images;
-CREATE POLICY product_images_write ON public.product_images FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
 
 -- demand_requirements
 DROP POLICY IF EXISTS demand_requirements_select ON public.demand_requirements;
 CREATE POLICY demand_requirements_select ON public.demand_requirements FOR SELECT USING (auth.uid() IS NOT NULL);
 DROP POLICY IF EXISTS demand_requirements_write ON public.demand_requirements;
 CREATE POLICY demand_requirements_write ON public.demand_requirements FOR ALL USING (
-    public.is_admin() OR EXISTS (SELECT 1 FROM public.demands d WHERE d.id = demand_requirements.demand_id AND d.customer_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.demands d WHERE d.id = demand_requirements.demand_id AND d.customer_id = auth.uid())
 ) WITH CHECK (
-    public.is_admin() OR EXISTS (SELECT 1 FROM public.demands d WHERE d.id = demand_requirements.demand_id AND d.customer_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.demands d WHERE d.id = demand_requirements.demand_id AND d.customer_id = auth.uid())
 );
 
 -- merchant_verifications
 DROP POLICY IF EXISTS merchant_verifications_select ON public.merchant_verifications;
-CREATE POLICY merchant_verifications_select ON public.merchant_verifications FOR SELECT USING (merchant_id = auth.uid() OR public.is_admin());
+CREATE POLICY merchant_verifications_select ON public.merchant_verifications FOR SELECT USING (merchant_id = auth.uid());
 DROP POLICY IF EXISTS merchant_verifications_write ON public.merchant_verifications;
-CREATE POLICY merchant_verifications_write ON public.merchant_verifications FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
+CREATE POLICY merchant_verifications_write ON public.merchant_verifications FOR ALL USING (merchant_id = auth.uid()) WITH CHECK (merchant_id = auth.uid());
 
 -- merchant_categories
 DROP POLICY IF EXISTS merchant_categories_select ON public.merchant_categories;
 CREATE POLICY merchant_categories_select ON public.merchant_categories FOR SELECT USING (TRUE);
 DROP POLICY IF EXISTS merchant_categories_write ON public.merchant_categories;
-CREATE POLICY merchant_categories_write ON public.merchant_categories FOR ALL USING (merchant_id = auth.uid() OR public.is_admin()) WITH CHECK (merchant_id = auth.uid() OR public.is_admin());
+CREATE POLICY merchant_categories_write ON public.merchant_categories FOR ALL USING (merchant_id = auth.uid()) WITH CHECK (merchant_id = auth.uid());
 
 -- offer_items (visible where parent offer visible)
 DROP POLICY IF EXISTS offer_items_select ON public.offer_items;
 CREATE POLICY offer_items_select ON public.offer_items FOR SELECT USING (
     EXISTS (SELECT 1 FROM public.merchant_offers o WHERE o.id = offer_items.offer_id AND (
-        o.merchant_id = auth.uid() OR public.is_admin() OR EXISTS (SELECT 1 FROM public.demands d WHERE d.id = o.demand_id AND d.customer_id = auth.uid())
+        o.merchant_id = auth.uid() OR EXISTS (SELECT 1 FROM public.demands d WHERE d.id = o.demand_id AND d.customer_id = auth.uid())
     ))
 );
 DROP POLICY IF EXISTS offer_items_write ON public.offer_items;
 CREATE POLICY offer_items_write ON public.offer_items FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.merchant_offers o WHERE o.id = offer_items.offer_id AND (o.merchant_id = auth.uid() OR public.is_admin()))
+    EXISTS (SELECT 1 FROM public.merchant_offers o WHERE o.id = offer_items.offer_id AND (o.merchant_id = auth.uid()))
 ) WITH CHECK (
-    EXISTS (SELECT 1 FROM public.merchant_offers o WHERE o.id = offer_items.offer_id AND (o.merchant_id = auth.uid() OR public.is_admin()))
+    EXISTS (SELECT 1 FROM public.merchant_offers o WHERE o.id = offer_items.offer_id AND (o.merchant_id = auth.uid()))
 );
 
 -- offer_eligibility
 DROP POLICY IF EXISTS offer_eligibility_select ON public.offer_eligibility;
 CREATE POLICY offer_eligibility_select ON public.offer_eligibility FOR SELECT USING (
-    customer_id = auth.uid() OR public.is_admin() OR EXISTS (SELECT 1 FROM public.merchant_offers o WHERE o.id = offer_eligibility.offer_id AND o.merchant_id = auth.uid())
+    customer_id = auth.uid() OR EXISTS (SELECT 1 FROM public.merchant_offers o WHERE o.id = offer_eligibility.offer_id AND o.merchant_id = auth.uid())
 );
 DROP POLICY IF EXISTS offer_eligibility_write ON public.offer_eligibility;
-CREATE POLICY offer_eligibility_write ON public.offer_eligibility FOR ALL USING (public.is_admin() OR EXISTS (SELECT 1 FROM public.merchant_offers o WHERE o.id = offer_eligibility.offer_id AND o.merchant_id = auth.uid())) WITH CHECK (public.is_admin() OR EXISTS (SELECT 1 FROM public.merchant_offers o WHERE o.id = offer_eligibility.offer_id AND o.merchant_id = auth.uid()));
+CREATE POLICY offer_eligibility_write ON public.offer_eligibility FOR ALL USING (EXISTS (SELECT 1 FROM public.merchant_offers o WHERE o.id = offer_eligibility.offer_id AND o.merchant_id = auth.uid())) WITH CHECK (EXISTS (SELECT 1 FROM public.merchant_offers o WHERE o.id = offer_eligibility.offer_id AND o.merchant_id = auth.uid()));
 
 -- order_items
 DROP POLICY IF EXISTS order_items_select ON public.order_items;
 CREATE POLICY order_items_select ON public.order_items FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.orders o WHERE o.id = order_items.order_id AND (o.customer_id = auth.uid() OR o.merchant_id = auth.uid() OR public.is_admin()))
+    EXISTS (SELECT 1 FROM public.orders o WHERE o.id = order_items.order_id AND (o.customer_id = auth.uid() OR o.merchant_id = auth.uid()))
 );
 DROP POLICY IF EXISTS order_items_write ON public.order_items;
-CREATE POLICY order_items_write ON public.order_items FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
+CREATE POLICY order_items_write ON public.order_items FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.orders o WHERE o.id = order_items.order_id AND (o.merchant_id = auth.uid()))
+) WITH CHECK (
+    EXISTS (SELECT 1 FROM public.orders o WHERE o.id = order_items.order_id AND (o.merchant_id = auth.uid()))
+);
 
--- payments (customer read, admin write)
+-- payments (customer read)
 DROP POLICY IF EXISTS payments_select ON public.payments;
 CREATE POLICY payments_select ON public.payments FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.orders o WHERE o.id = payments.order_id AND (o.customer_id = auth.uid() OR public.is_admin()))
+    EXISTS (SELECT 1 FROM public.orders o WHERE o.id = payments.order_id AND (o.customer_id = auth.uid()))
 );
 DROP POLICY IF EXISTS payments_write ON public.payments;
-CREATE POLICY payments_write ON public.payments FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
+CREATE POLICY payments_write ON public.payments FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.orders o WHERE o.id = payments.order_id AND (o.merchant_id = auth.uid()))
+) WITH CHECK (
+    EXISTS (SELECT 1 FROM public.orders o WHERE o.id = payments.order_id AND (o.merchant_id = auth.uid()))
+);
 
 -- fulfillment_milestones
 DROP POLICY IF EXISTS fulfillment_milestones_select ON public.fulfillment_milestones;
 CREATE POLICY fulfillment_milestones_select ON public.fulfillment_milestones FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.orders o WHERE o.id = fulfillment_milestones.order_id AND (o.customer_id = auth.uid() OR o.merchant_id = auth.uid() OR public.is_admin()))
+    EXISTS (SELECT 1 FROM public.orders o WHERE o.id = fulfillment_milestones.order_id AND (o.customer_id = auth.uid() OR o.merchant_id = auth.uid()))
 );
 DROP POLICY IF EXISTS fulfillment_milestones_write ON public.fulfillment_milestones;
 CREATE POLICY fulfillment_milestones_write ON public.fulfillment_milestones FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.orders o WHERE o.id = fulfillment_milestones.order_id AND (o.merchant_id = auth.uid() OR public.is_admin()))
+    EXISTS (SELECT 1 FROM public.orders o WHERE o.id = fulfillment_milestones.order_id AND (o.merchant_id = auth.uid()))
 ) WITH CHECK (
-    EXISTS (SELECT 1 FROM public.orders o WHERE o.id = fulfillment_milestones.order_id AND (o.merchant_id = auth.uid() OR public.is_admin()))
+    EXISTS (SELECT 1 FROM public.orders o WHERE o.id = fulfillment_milestones.order_id AND (o.merchant_id = auth.uid()))
 );
 
--- platform_settings (admin only)
+-- platform_settings (removed)
 DROP POLICY IF EXISTS platform_settings_admin ON public.platform_settings;
-CREATE POLICY platform_settings_admin ON public.platform_settings FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
 
--- audit_logs (admin read, admin/service insert)
+-- audit_logs (removed)
 DROP POLICY IF EXISTS audit_logs_select ON public.audit_logs;
-CREATE POLICY audit_logs_select ON public.audit_logs FOR SELECT USING (public.is_admin());
 DROP POLICY IF EXISTS audit_logs_insert ON public.audit_logs;
-CREATE POLICY audit_logs_insert ON public.audit_logs FOR INSERT WITH CHECK (public.is_admin());

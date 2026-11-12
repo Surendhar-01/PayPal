@@ -18,7 +18,7 @@ ALTER TABLE public.merchant_offer_attachments ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS moa_select ON public.merchant_offer_attachments;
 CREATE POLICY moa_select ON public.merchant_offer_attachments FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.merchant_offers o WHERE o.id = merchant_offer_attachments.offer_id AND (o.merchant_id = auth.uid() OR public.is_admin()))
+    EXISTS (SELECT 1 FROM public.merchant_offers o WHERE o.id = merchant_offer_attachments.offer_id AND (o.merchant_id = auth.uid()))
 );
 
 DROP POLICY IF EXISTS moa_insert ON public.merchant_offer_attachments;

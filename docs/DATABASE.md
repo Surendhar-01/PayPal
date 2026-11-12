@@ -189,7 +189,7 @@ Platform management:
 - RLS is enabled on all application tables.
 - Customers can access only their own profile, demands, orders, payments, and authorized offers.
 - Merchants can access their own private merchant profile and manage only their own offers and fulfillment records.
-- Admin access is role-based through `profiles.role` and `is_admin()`.
+- Only Customer and Merchant roles are supported; no Admin access paths remain.
 - Service-role key is never exposed to the frontend.
 
 ## Auth Integration
@@ -230,8 +230,7 @@ The shared auth context verifies the active Supabase user with `auth.getUser()`,
 then loads that user's `profiles` row by the same ID under RLS. The role in
 `profiles.role` is authoritative; user metadata is only a display-name and
 profile-image fallback. Customer and merchant details come from their matching
-role-specific profile rows. Admins use the `profiles` row; there is no separate
-admin profile table.
+role-specific profile rows. There is no separate admin profile table.
 
 ## Email Configuration (Supabase Auth)
 

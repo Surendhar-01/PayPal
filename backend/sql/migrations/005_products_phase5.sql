@@ -104,7 +104,7 @@ CREATE POLICY "Admin can upload product images" ON storage.objects
 FOR INSERT
 WITH CHECK (
     bucket_id = 'product-images' AND
-    ((auth.jwt() ->> 'role' = 'admin') OR (public.is_admin()))
+    ((public.is_admin()))
 );
 
 DROP POLICY IF EXISTS "Admin can delete product images" ON storage.objects;
@@ -112,7 +112,7 @@ CREATE POLICY "Admin can delete product images" ON storage.objects
 FOR DELETE
 USING (
     bucket_id = 'product-images' AND
-    ((auth.jwt() ->> 'role' = 'admin') OR (public.is_admin()))
+    ((public.is_admin()))
 );
 
 -- -----------------------------------------------------------------------------

@@ -739,7 +739,7 @@ export const MerchantOrders: React.FC = () => {
                         type="info"
                         showIcon
                         title="Real-time Platform Synchronization"
-                        description="Any milestone update and logistics tracking number saved here immediately updates the Customer dashboard and Admin monitoring dashboard via Supabase Realtime."
+                        description="Any milestone update and logistics tracking number saved here immediately updates the Customer dashboard via Supabase Realtime."
                       />
 
                       <Form form={form} layout="vertical" onFinish={handleUpdateStatus}>

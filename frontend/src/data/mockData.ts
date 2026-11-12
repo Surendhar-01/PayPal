@@ -1,6 +1,6 @@
 /**
  * MarketTwin Mock Data Store
- * Powers Customer, Merchant, and Admin modules with realistic demand-driven marketplace data.
+ * Powers Customer and Merchant modules with realistic demand-driven marketplace data.
  */
 
 export interface ProductItem {
@@ -513,22 +513,4 @@ export const mockNotifications: NotificationItem[] = [
     type: 'system',
     unread: false,
   },
-];
-
-// 7. Customers List (for Admin Management)
-export const mockCustomersList = [
-  { id: 'c-1', name: 'Alex Mercer', email: 'alex.mercer@techstart.io', company: 'TechStart Studios', activeDemands: 3, approvedOrders: 2, totalSpent: 3700, status: 'Active', joinedDate: '2026-04-12' },
-  { id: 'c-2', name: 'Sarah Jenkins', email: 'sarah.j@greenpower.co', company: 'GreenPower Systems', activeDemands: 1, approvedOrders: 1, totalSpent: 5520, status: 'Active', joinedDate: '2026-05-19' },
-  { id: 'c-3', name: 'Marcus Wong', email: 'marcus@brewlabcafe.com', company: 'BrewLab Specialty Coffee', activeDemands: 2, approvedOrders: 4, totalSpent: 4890, status: 'Active', joinedDate: '2026-06-03' },
-  { id: 'c-4', name: 'Elena Rostova', email: 'elena@novadesign.org', company: 'Nova Architecture', activeDemands: 0, approvedOrders: 1, totalSpent: 1650, status: 'Active', joinedDate: '2026-07-22' },
-  { id: 'c-5', name: 'David Kim', email: 'dkim@apexlogistics.net', company: 'Apex Logistics', activeDemands: 1, approvedOrders: 0, totalSpent: 0, status: 'Pending Verification', joinedDate: '2026-10-30' },
-];
-
-// 8. Merchants List (for Admin Management)
-export const mockMerchantsList = [
-  { id: 'm-1', name: 'Apex Workspace Solutions', contact: 'Marcus Vance', email: 'partners@apexworkspace.com', category: 'Office Furniture', rating: 4.9, activeBids: 6, wonOrders: 34, gmv: 84200, status: 'Verified' },
-  { id: 'm-2', name: 'Helios Industrial Tech', contact: 'Elena Zhang', email: 'b2b@heliostech.com', category: 'Renewable Energy', rating: 4.9, activeBids: 3, wonOrders: 19, gmv: 142000, status: 'Verified' },
-  { id: 'm-3', name: 'BaristaCraft Global', contact: 'Luca Moretti', email: 'sales@baristacraft.it', category: 'Commercial Kitchen', rating: 4.8, activeBids: 4, wonOrders: 28, gmv: 96500, status: 'Verified' },
-  { id: 'm-4', name: 'Kyoto Imports Direct', contact: 'Kenji Sato', email: 'trade@kyotoimports.jp', category: 'Food & Beverage', rating: 4.9, activeBids: 5, wonOrders: 45, gmv: 62400, status: 'Verified' },
-  { id: 'm-5', name: 'Nordic Electro Supply', contact: 'Frederik Lind', email: 'info@nordicelectro.se', category: 'Electronics', rating: 4.5, activeBids: 2, wonOrders: 8, gmv: 31200, status: 'Under Review' },
 ];

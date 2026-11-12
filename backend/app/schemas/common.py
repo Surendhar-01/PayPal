@@ -9,7 +9,6 @@ class UserRoleEnum(str, Enum):
     """Platform user roles."""
     CUSTOMER = "customer"
     MERCHANT = "merchant"
-    ADMIN = "admin"
 
 
 class ApiResponse(BaseModel, Generic[T]):

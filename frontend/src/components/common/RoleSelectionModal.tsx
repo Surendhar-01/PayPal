@@ -1,12 +1,6 @@
 import React from 'react';
-import { Card, Modal, Tag, Typography } from 'antd';
-import {
-  ArrowRightOutlined,
-  LockOutlined,
-  SafetyCertificateOutlined,
-  ShopOutlined,
-  UserOutlined,
-} from '@ant-design/icons';
+import { Card, Modal, Typography } from 'antd';
+import { ArrowRightOutlined, ShopOutlined, UserOutlined } from '@ant-design/icons';
 import type { AppRole } from '../../context/AuthContext';
 import './RoleSelectionModal.css';
 
@@ -19,7 +13,7 @@ interface RoleSelectionModalProps {
   onSelectRole: (role: AppRole) => void;
 }
 
-const { Paragraph, Text, Title } = Typography;
+const { Paragraph, Title } = Typography;
 
 const roles: Array<{
   role: AppRole;
@@ -39,20 +33,9 @@ const roles: Array<{
     description: 'Manage products, submit offers and fulfill customer orders.',
     icon: <ShopOutlined />,
   },
-  {
-    role: 'admin',
-    title: 'Admin',
-    description: 'Monitor marketplace activities and manage the platform.',
-    icon: <SafetyCertificateOutlined />,
-  },
 ];
 
-const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
-  open,
-  action,
-  onClose,
-  onSelectRole,
-}) => (
+const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({ open, onClose, onSelectRole }) => (
   <Modal
     className="role-selection-modal"
     open={open}
@@ -72,20 +55,17 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
   >
     <div className="role-selection-grid">
       {roles.map(({ role, title, description, icon }) => {
-        const disabled = action === 'register' && role === 'admin';
         return (
           <Card
             key={role}
-            className={`role-selection-card${disabled ? ' role-selection-card--disabled' : ''}`}
-            hoverable={!disabled}
+            className="role-selection-card"
+            hoverable
             role="button"
-            tabIndex={disabled ? -1 : 0}
-            aria-disabled={disabled}
-            onClick={() => {
-              if (!disabled) onSelectRole(role);
-            }}
+            tabIndex={0}
+            aria-disabled={false}
+            onClick={() => onSelectRole(role)}
             onKeyDown={(event) => {
-              if (!disabled && (event.key === 'Enter' || event.key === ' ')) {
+              if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault();
                 onSelectRole(role);
               }
@@ -93,23 +73,12 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
           >
             <div className="role-selection-card-top">
               <span className="role-selection-icon">{icon}</span>
-              {disabled ? (
-                <Tag icon={<LockOutlined />} className="role-selection-tag">
-                  Login only
-                </Tag>
-              ) : (
-                <span className="role-selection-indicator" aria-hidden="true">
-                  <ArrowRightOutlined />
-                </span>
-              )}
+              <span className="role-selection-indicator" aria-hidden="true">
+                <ArrowRightOutlined />
+              </span>
             </div>
             <Title level={4}>{title}</Title>
             <Paragraph>{description}</Paragraph>
-            {disabled && (
-              <Text className="role-selection-restriction">
-                Admin accounts are provisioned securely. Public registration is unavailable.
-              </Text>
-            )}
           </Card>
         );
       })}

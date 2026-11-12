@@ -4,7 +4,6 @@ import { Card, Form, Input, Button, Typography, Alert, Space } from 'antd';
 import { MailOutlined, LockOutlined } from '@ant-design/icons';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../services/supabase';
-import axiosClient from '../../api/axiosClient';
 import {
   authReturnState,
   safeAuthReturnLocation,
@@ -19,9 +18,7 @@ const LoginPage: React.FC = () => {
   const { signIn, signOut } = useAuth();
   const requestedRole = searchParams.get('role');
   const selectedRole =
-    requestedRole === 'admin' || requestedRole === 'merchant'
-      ? requestedRole
-      : 'customer';
+    requestedRole === 'merchant' ? requestedRole : 'customer';
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,29 +26,11 @@ const LoginPage: React.FC = () => {
     setLoading(true);
     setError(null);
 
-    if (selectedRole === 'admin') {
-      try {
-        const res = await axiosClient.post('/api/v1/auth/admin/login', {
-          email: values.email,
-          password: values.password,
-        });
-        if (!supabase) throw new Error('Supabase is not configured.');
-        await supabase.auth.setSession({
-          access_token: res.data.access_token,
-          refresh_token: res.data.refresh_token,
-        });
-      } catch (e: any) {
-        setLoading(false);
-        setError(e?.response?.data?.detail || e?.message || 'Invalid admin credentials.');
-        return;
-      }
-    } else {
-      const { error: err } = await signIn(values.email, values.password);
-      if (err) {
-        setLoading(false);
-        setError(err);
-        return;
-      }
+    const { error: err } = await signIn(values.email, values.password);
+    if (err) {
+      setLoading(false);
+      setError(err);
+      return;
     }
 
     if (!supabase) {
@@ -104,12 +83,11 @@ const LoginPage: React.FC = () => {
 
     setLoading(false);
     const returnLocation = safeAuthReturnLocation(location.state);
-    const target = actualRole === 'customer' && returnLocation
-      ? `${returnLocation.pathname}${returnLocation.search}${returnLocation.hash}`
-      : actualRole === 'admin'
-        ? '/admin/dashboard'
-        : actualRole === 'merchant'
-          ? '/merchant/dashboard'
+    const target =
+      actualRole === 'merchant'
+        ? '/merchant/dashboard'
+        : returnLocation
+          ? `${returnLocation.pathname}${returnLocation.search}${returnLocation.hash}`
           : '/customer/dashboard';
     navigate(target, { replace: true });
   };

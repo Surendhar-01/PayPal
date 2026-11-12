@@ -5,7 +5,7 @@
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- Enums (guarded)
-DO $$ BEGIN CREATE TYPE user_role AS ENUM ('customer','merchant','admin'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE user_role AS ENUM ('customer','merchant'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE demand_status AS ENUM ('Pending','Grouped','Offers Received','Approved','Completed'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE demand_group_status AS ENUM ('Forming','Open for Bidding','Reviewing Offers','Finalized'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE offer_status AS ENUM ('Submitted','Under Review','Customer Approved','Rejected'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
@@ -164,15 +164,6 @@ CREATE INDEX IF NOT EXISTS idx_orders_customer ON public.orders(customer_id);
 CREATE INDEX IF NOT EXISTS idx_orders_merchant ON public.orders(merchant_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON public.notifications(user_id);
 
--- Helper: admin check
-CREATE OR REPLACE FUNCTION public.is_admin()
-RETURNS BOOLEAN
-LANGUAGE sql
-STABLE
-AS $$
-    SELECT EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin');
-$$;
-
 -- Auth trigger: create profile on signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
@@ -183,7 +174,14 @@ AS $$
 DECLARE
     v_role user_role;
 BEGIN
-    v_role := COALESCE((NEW.raw_user_meta_data->>'role')::user_role, 'customer');
+    v_role := COALESCE(
+        CASE
+            WHEN NEW.raw_user_meta_data->>'role' IN ('customer', 'merchant')
+            THEN (NEW.raw_user_meta_data->>'role')::user_role
+            ELSE NULL
+        END,
+        'customer'
+    );
     INSERT INTO public.profiles (id, email, full_name, role, company)
     VALUES (
         NEW.id,
@@ -224,49 +222,45 @@ ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
 -- Policies: profiles
 DROP POLICY IF EXISTS profiles_select ON public.profiles;
-CREATE POLICY profiles_select ON public.profiles FOR SELECT USING (id = auth.uid() OR public.is_admin());
+CREATE POLICY profiles_select ON public.profiles FOR SELECT USING (id = auth.uid());
 DROP POLICY IF EXISTS profiles_update ON public.profiles;
-CREATE POLICY profiles_update ON public.profiles FOR UPDATE USING (id = auth.uid() OR public.is_admin());
+CREATE POLICY profiles_update ON public.profiles FOR UPDATE USING (id = auth.uid());
 DROP POLICY IF EXISTS profiles_insert ON public.profiles;
-CREATE POLICY profiles_insert ON public.profiles FOR INSERT WITH CHECK (id = auth.uid() OR public.is_admin());
+CREATE POLICY profiles_insert ON public.profiles FOR INSERT WITH CHECK (id = auth.uid());
 
 -- customer_profiles
 DROP POLICY IF EXISTS customer_profiles_select ON public.customer_profiles;
-CREATE POLICY customer_profiles_select ON public.customer_profiles FOR SELECT USING (id = auth.uid() OR public.is_admin());
+CREATE POLICY customer_profiles_select ON public.customer_profiles FOR SELECT USING (id = auth.uid());
 DROP POLICY IF EXISTS customer_profiles_update ON public.customer_profiles;
-CREATE POLICY customer_profiles_update ON public.customer_profiles FOR UPDATE USING (id = auth.uid() OR public.is_admin());
+CREATE POLICY customer_profiles_update ON public.customer_profiles FOR UPDATE USING (id = auth.uid());
 DROP POLICY IF EXISTS customer_profiles_insert ON public.customer_profiles;
-CREATE POLICY customer_profiles_insert ON public.customer_profiles FOR INSERT WITH CHECK (id = auth.uid() OR public.is_admin());
+CREATE POLICY customer_profiles_insert ON public.customer_profiles FOR INSERT WITH CHECK (id = auth.uid());
 
 -- merchant_profiles
 DROP POLICY IF EXISTS merchant_profiles_select ON public.merchant_profiles;
 CREATE POLICY merchant_profiles_select ON public.merchant_profiles FOR SELECT USING (TRUE);
 DROP POLICY IF EXISTS merchant_profiles_update ON public.merchant_profiles;
-CREATE POLICY merchant_profiles_update ON public.merchant_profiles FOR UPDATE USING (id = auth.uid() OR public.is_admin());
+CREATE POLICY merchant_profiles_update ON public.merchant_profiles FOR UPDATE USING (id = auth.uid());
 DROP POLICY IF EXISTS merchant_profiles_insert ON public.merchant_profiles;
-CREATE POLICY merchant_profiles_insert ON public.merchant_profiles FOR INSERT WITH CHECK (id = auth.uid() OR public.is_admin());
+CREATE POLICY merchant_profiles_insert ON public.merchant_profiles FOR INSERT WITH CHECK (id = auth.uid());
 
--- products (public read, admin write)
+-- products (public read)
 DROP POLICY IF EXISTS products_select ON public.products;
 CREATE POLICY products_select ON public.products FOR SELECT USING (TRUE);
-DROP POLICY IF EXISTS products_write ON public.products;
-CREATE POLICY products_write ON public.products FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
 
--- demand_groups (authenticated read; admin write)
+-- demand_groups (authenticated read)
 DROP POLICY IF EXISTS demand_groups_select ON public.demand_groups;
 CREATE POLICY demand_groups_select ON public.demand_groups FOR SELECT USING (auth.uid() IS NOT NULL);
-DROP POLICY IF EXISTS demand_groups_write ON public.demand_groups;
-CREATE POLICY demand_groups_write ON public.demand_groups FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
 
 -- demands
 DROP POLICY IF EXISTS demands_select ON public.demands;
 CREATE POLICY demands_select ON public.demands FOR SELECT USING (auth.uid() IS NOT NULL);
 DROP POLICY IF EXISTS demands_insert ON public.demands;
-CREATE POLICY demands_insert ON public.demands FOR INSERT WITH CHECK (customer_id = auth.uid() OR public.is_admin());
+CREATE POLICY demands_insert ON public.demands FOR INSERT WITH CHECK (customer_id = auth.uid());
 DROP POLICY IF EXISTS demands_update ON public.demands;
-CREATE POLICY demands_update ON public.demands FOR UPDATE USING (customer_id = auth.uid() OR public.is_admin());
+CREATE POLICY demands_update ON public.demands FOR UPDATE USING (customer_id = auth.uid());
 DROP POLICY IF EXISTS demands_delete ON public.demands;
-CREATE POLICY demands_delete ON public.demands FOR DELETE USING (customer_id = auth.uid() OR public.is_admin());
+CREATE POLICY demands_delete ON public.demands FOR DELETE USING (customer_id = auth.uid());
 
 -- demand_group_members
 DROP POLICY IF EXISTS dgm_select ON public.demand_group_members;
@@ -276,38 +270,37 @@ CREATE POLICY dgm_insert ON public.demand_group_members FOR INSERT WITH CHECK (c
 DROP POLICY IF EXISTS dgm_update ON public.demand_group_members;
 CREATE POLICY dgm_update ON public.demand_group_members FOR UPDATE USING (customer_id = auth.uid());
 DROP POLICY IF EXISTS dgm_delete ON public.demand_group_members;
-CREATE POLICY dgm_delete ON public.demand_group_members FOR DELETE USING (customer_id = auth.uid() OR public.is_admin());
+CREATE POLICY dgm_delete ON public.demand_group_members FOR DELETE USING (customer_id = auth.uid());
 
 -- offers
 DROP POLICY IF EXISTS offers_select ON public.merchant_offers;
 CREATE POLICY offers_select ON public.merchant_offers FOR SELECT USING (
     merchant_id = auth.uid()
-    OR public.is_admin()
     OR EXISTS (SELECT 1 FROM public.demands d WHERE d.id = merchant_offers.demand_id AND d.customer_id = auth.uid())
 );
 DROP POLICY IF EXISTS offers_insert ON public.merchant_offers;
-CREATE POLICY offers_insert ON public.merchant_offers FOR INSERT WITH CHECK (merchant_id = auth.uid() OR public.is_admin());
+CREATE POLICY offers_insert ON public.merchant_offers FOR INSERT WITH CHECK (merchant_id = auth.uid());
 DROP POLICY IF EXISTS offers_update ON public.merchant_offers;
-CREATE POLICY offers_update ON public.merchant_offers FOR UPDATE USING (merchant_id = auth.uid() OR public.is_admin());
+CREATE POLICY offers_update ON public.merchant_offers FOR UPDATE USING (merchant_id = auth.uid());
 DROP POLICY IF EXISTS offers_delete ON public.merchant_offers;
-CREATE POLICY offers_delete ON public.merchant_offers FOR DELETE USING (merchant_id = auth.uid() OR public.is_admin());
+CREATE POLICY offers_delete ON public.merchant_offers FOR DELETE USING (merchant_id = auth.uid());
 
 -- orders
 DROP POLICY IF EXISTS orders_select ON public.orders;
 CREATE POLICY orders_select ON public.orders FOR SELECT USING (
-    customer_id = auth.uid() OR merchant_id = auth.uid() OR public.is_admin()
+    customer_id = auth.uid() OR merchant_id = auth.uid()
 );
 DROP POLICY IF EXISTS orders_insert ON public.orders;
-CREATE POLICY orders_insert ON public.orders FOR INSERT WITH CHECK (customer_id = auth.uid() OR public.is_admin());
+CREATE POLICY orders_insert ON public.orders FOR INSERT WITH CHECK (customer_id = auth.uid());
 DROP POLICY IF EXISTS orders_update ON public.orders;
-CREATE POLICY orders_update ON public.orders FOR UPDATE USING (merchant_id = auth.uid() OR public.is_admin());
+CREATE POLICY orders_update ON public.orders FOR UPDATE USING (merchant_id = auth.uid());
 
 -- notifications
 DROP POLICY IF EXISTS notifications_select ON public.notifications;
-CREATE POLICY notifications_select ON public.notifications FOR SELECT USING (user_id = auth.uid() OR public.is_admin());
+CREATE POLICY notifications_select ON public.notifications FOR SELECT USING (user_id = auth.uid());
 DROP POLICY IF EXISTS notifications_insert ON public.notifications;
-CREATE POLICY notifications_insert ON public.notifications FOR INSERT WITH CHECK (user_id = auth.uid() OR public.is_admin());
+CREATE POLICY notifications_insert ON public.notifications FOR INSERT WITH CHECK (user_id = auth.uid());
 DROP POLICY IF EXISTS notifications_update ON public.notifications;
-CREATE POLICY notifications_update ON public.notifications FOR UPDATE USING (user_id = auth.uid() OR public.is_admin());
+CREATE POLICY notifications_update ON public.notifications FOR UPDATE USING (user_id = auth.uid());
 DROP POLICY IF EXISTS notifications_delete ON public.notifications;
-CREATE POLICY notifications_delete ON public.notifications FOR DELETE USING (user_id = auth.uid() OR public.is_admin());
+CREATE POLICY notifications_delete ON public.notifications FOR DELETE USING (user_id = auth.uid());

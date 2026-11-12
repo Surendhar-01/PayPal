@@ -66,18 +66,18 @@ def _rpc_failure_message(diagnostics: Dict[str, Optional[str]]) -> str:
     if code in {"PGRST202", "PGRST106"}:
         return (
             "Demand submission is unavailable because its database RPC is not exposed to PostgREST. "
-            "An administrator should verify migrations 020-021, the public RPC signature and grant, "
+            "Please verify the public RPC signature and grant, "
             "and reload the PostgREST schema cache if the migrations are applied."
         )
     if http_status == "404":
         return (
             "Demand submission received an unexpected database 404. "
-            "An administrator should verify the RPC signature, API schema exposure, and schema cache."
+            "Please verify the RPC signature, API schema exposure, and schema cache."
         )
     if code == "42501" or http_status in {"401", "403"}:
         return (
             "Demand submission is blocked by database permissions. "
-            "An administrator should verify the backend service-role configuration and RPC grant."
+            "Please verify the backend service-role configuration and RPC grant."
         )
     return "Demand could not be saved. Your reviewed form has not been cleared; please retry."
 
@@ -106,7 +106,7 @@ async def create_demand(
     client = get_supabase_service_client()
     if client is None:
         raise DemandPersistenceError(
-            "Demand submission is unavailable because the backend service-role client is not configured. Contact an administrator.",
+            "Demand submission is unavailable because the backend service-role client is not configured. Please contact support.",
             {
                 "code": "SERVICE_ROLE_CLIENT_UNAVAILABLE",
                 "message": None,

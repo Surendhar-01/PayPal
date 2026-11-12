@@ -123,42 +123,4 @@ def test_match_demand_endpoint():
     assert data["create_demand_params"]["targetQuantity"] == 10
 
 
-def test_inactive_products_hidden_from_search():
-    """10. Verify inactive / deactivated products are excluded from public search."""
-    mock_admin_user = {
-        "id": "a0000000-0000-0000-0000-000000000001",
-        "email": "admin@markettwin.com",
-        "role": "admin",
-        "metadata": {"role": "admin"},
-        "email_confirmed_at": "2026-01-01T00:00:00Z",
-    }
-    app.dependency_overrides[get_current_user] = lambda: mock_admin_user
 
-    try:
-        import uuid
-        unique_sku = f"INACT-{uuid.uuid4().hex[:6].upper()}"
-        create_res = client.post(
-            "/api/admin/products",
-            json={
-                "name": "Secret Experimental Deactivated Drone",
-                "category": "Robotics",
-                "model_number": unique_sku,
-                "retail_price": 999.00,
-                "wholesale_price": 800.00,
-                "status": "inactive",
-            },
-        )
-        assert create_res.status_code == 201
-        created_id = create_res.json()["id"]
-
-        # Search for it publicly
-        search_res = client.get(f"/api/products/search?q={unique_sku}")
-        assert search_res.status_code == 200
-        # Inactive item MUST NOT appear
-        matched_ids = [item["id"] for item in search_res.json()["items"]]
-        assert created_id not in matched_ids
-
-        # Clean up
-        client.delete(f"/api/admin/products/{created_id}?hard_delete=true")
-    finally:
-        app.dependency_overrides.clear()

@@ -563,7 +563,7 @@ export const MerchantDashboard: React.FC = () => {
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#059669', background: '#F0FDF4', padding: '8px 12px', borderRadius: 6 }}>
               <SafetyCertificateOutlined />
-              <span>Updating this stage immediately reflects across the Customer and Admin dashboards in real time.</span>
+              <span>Updating this stage immediately reflects across the Customer dashboard in real time.</span>
             </div>
           </div>
         )}

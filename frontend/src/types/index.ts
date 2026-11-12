@@ -3,7 +3,7 @@
  * Phase 1: Architectural Foundations & Setup
  */
 
-export type UserRole = 'customer' | 'merchant' | 'admin';
+export type UserRole = 'customer' | 'merchant';
 
 export interface UserProfileSummary {
   id: string;
