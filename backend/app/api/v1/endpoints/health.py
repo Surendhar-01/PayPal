@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Response, status
 from app.core.config import get_settings
 from app.core.supabase import check_supabase_health
 from app.schemas.health import HealthCheckResponse, ServiceStatus
@@ -46,6 +46,16 @@ async def get_health() -> HealthCheckResponse:
         environment=settings.ENVIRONMENT,
         services=services
     )
+
+
+@router.head(
+    "/health",
+    status_code=status.HTTP_200_OK,
+    summary="Comprehensive System Health Check",
+    description="HEAD probe for container liveness / readiness checks.",
+)
+async def head_health():
+    return Response(status_code=200)
 
 
 @router.get(

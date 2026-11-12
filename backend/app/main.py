@@ -3,7 +3,7 @@ import re
 import time
 import uuid
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -152,6 +152,10 @@ def create_application() -> FastAPI:
         from app.api.v1.endpoints.health import get_health
         return await get_health()
 
+    @application.head("/health", include_in_schema=True, tags=["Health & System Diagnostics"])
+    async def root_health_head():
+        return Response(status_code=200)
+
     @application.get("/health/ping", include_in_schema=True, tags=["Health & System Diagnostics"])
     async def root_health_ping():
         from app.api.v1.endpoints.health import ping
@@ -167,6 +171,10 @@ def create_application() -> FastAPI:
             "documentation": "/docs",
             "health_check": "/api/v1/health",
         }
+
+    @application.head("/", include_in_schema=False)
+    async def root_head():
+        return Response(status_code=200)
 
     return application
 
