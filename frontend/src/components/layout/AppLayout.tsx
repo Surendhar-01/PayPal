@@ -55,7 +55,7 @@ import { fetchNotifications, type NotificationItem } from '../../services/notifi
 const { Header, Sider, Content, Footer } = Layout;
 const { Text } = Typography;
 
-export type ActiveRole = 'customer' | 'merchant' | 'admin';
+export type ActiveRole = 'customer' | 'merchant';
 
 export const AppLayout: React.FC = () => {
   const navigate = useNavigate();
@@ -420,7 +420,7 @@ export const AppLayout: React.FC = () => {
                 Active Module
               </span>
               <Tag
-                color={activeRole === 'customer' ? 'blue' : activeRole === 'merchant' ? 'orange' : 'purple'}
+                color={activeRole === 'customer' ? 'blue' : 'orange'}
                 style={{ margin: 0, textTransform: 'capitalize', fontWeight: 700, borderRadius: 14, padding: '2px 10px', fontSize: 12 }}
               >
                 {activeRole}
@@ -632,7 +632,7 @@ export const AppLayout: React.FC = () => {
             {user && profile && activeRole ? (
               <>
                 <Tag
-                  color={activeRole === 'customer' ? 'blue' : activeRole === 'merchant' ? 'orange' : 'purple'}
+                  color={activeRole === 'customer' ? 'blue' : 'orange'}
                   style={{ textTransform: 'capitalize', fontSize: 12.5, padding: '3px 12px', borderRadius: 14, fontWeight: 600 }}
                 >
                   {activeRole}

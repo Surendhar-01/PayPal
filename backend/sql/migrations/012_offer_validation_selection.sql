@@ -54,19 +54,19 @@ ALTER TABLE public.customer_offer_selections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.offer_comparison_history ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS coe_select ON public.customer_offer_eligibility;
-CREATE POLICY coe_select ON public.customer_offer_eligibility FOR SELECT USING (customer_id = auth.uid() OR public.is_admin());
+CREATE POLICY coe_select ON public.customer_offer_eligibility FOR SELECT USING (customer_id = auth.uid());
 
 DROP POLICY IF EXISTS coe_write ON public.customer_offer_eligibility;
 CREATE POLICY coe_write ON public.customer_offer_eligibility FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
 
 DROP POLICY IF EXISTS cos_select ON public.customer_offer_selections;
-CREATE POLICY cos_select ON public.customer_offer_selections FOR SELECT USING (customer_id = auth.uid() OR public.is_admin());
+CREATE POLICY cos_select ON public.customer_offer_selections FOR SELECT USING (customer_id = auth.uid());
 
 DROP POLICY IF EXISTS cos_insert ON public.customer_offer_selections;
 CREATE POLICY cos_insert ON public.customer_offer_selections FOR INSERT WITH CHECK (customer_id = auth.uid());
 
 DROP POLICY IF EXISTS och_select ON public.offer_comparison_history;
-CREATE POLICY och_select ON public.offer_comparison_history FOR SELECT USING (customer_id = auth.uid() OR public.is_admin());
+CREATE POLICY och_select ON public.offer_comparison_history FOR SELECT USING (customer_id = auth.uid());
 
 DROP POLICY IF EXISTS och_insert ON public.offer_comparison_history;
 CREATE POLICY och_insert ON public.offer_comparison_history FOR INSERT WITH CHECK (customer_id = auth.uid());

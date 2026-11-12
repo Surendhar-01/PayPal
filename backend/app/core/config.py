@@ -54,8 +54,6 @@ class Settings(BaseSettings):
         description="Enable cross-customer demand analysis only after privacy verification.",
     )
     FRONTEND_URL: str = Field(default="http://localhost:5173", description="Frontend base URL for auth redirects")
-    ADMIN_EMAIL: str = Field(default="", description="Admin login email")
-    ADMIN_PASSWORD: str = Field(default="", description="Admin login password")
     GROQ_API_KEY: str = Field(default="", description="Groq API key for AI features")
     AI_PROVIDER: str = Field(default="ollama", description="AI provider used for requirement conversations")
     OLLAMA_BASE_URL: str = Field(default="http://localhost:11434", description="Ollama API base URL")

@@ -75,26 +75,26 @@ ALTER TABLE public.delivery_confirmations ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS osh_select ON public.order_status_history;
 CREATE POLICY osh_select ON public.order_status_history FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.orders o WHERE o.id = order_status_history.order_id AND (o.customer_id = auth.uid() OR o.merchant_id = auth.uid() OR public.is_admin()))
+    EXISTS (SELECT 1 FROM public.orders o WHERE o.id = order_status_history.order_id AND (o.customer_id = auth.uid() OR o.merchant_id = auth.uid()))
 );
 
 DROP POLICY IF EXISTS shipments_select ON public.shipments;
 CREATE POLICY shipments_select ON public.shipments FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.orders o WHERE o.id = shipments.order_id AND (o.customer_id = auth.uid() OR o.merchant_id = auth.uid() OR public.is_admin()))
+    EXISTS (SELECT 1 FROM public.orders o WHERE o.id = shipments.order_id AND (o.customer_id = auth.uid() OR o.merchant_id = auth.uid()))
 );
 
 DROP POLICY IF EXISTS ste_select ON public.shipment_tracking_events;
 CREATE POLICY ste_select ON public.shipment_tracking_events FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.shipments s JOIN public.orders o ON o.id = s.order_id WHERE s.id = shipment_tracking_events.shipment_id AND (o.customer_id = auth.uid() OR o.merchant_id = auth.uid() OR public.is_admin()))
+    EXISTS (SELECT 1 FROM public.shipments s JOIN public.orders o ON o.id = s.order_id WHERE s.id = shipment_tracking_events.shipment_id AND (o.customer_id = auth.uid() OR o.merchant_id = auth.uid()))
 );
 
 DROP POLICY IF EXISTS dd_select ON public.delivery_documents;
 CREATE POLICY dd_select ON public.delivery_documents FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.orders o WHERE o.id = delivery_documents.order_id AND (o.customer_id = auth.uid() OR o.merchant_id = auth.uid() OR public.is_admin()))
+    EXISTS (SELECT 1 FROM public.orders o WHERE o.id = delivery_documents.order_id AND (o.customer_id = auth.uid() OR o.merchant_id = auth.uid()))
 );
 
 DROP POLICY IF EXISTS dc_select ON public.delivery_confirmations;
-CREATE POLICY dc_select ON public.delivery_confirmations FOR SELECT USING (customer_id = auth.uid() OR public.is_admin());
+CREATE POLICY dc_select ON public.delivery_confirmations FOR SELECT USING (customer_id = auth.uid());
 
 DROP POLICY IF EXISTS dc_insert ON public.delivery_confirmations;
 CREATE POLICY dc_insert ON public.delivery_confirmations FOR INSERT WITH CHECK (customer_id = auth.uid());

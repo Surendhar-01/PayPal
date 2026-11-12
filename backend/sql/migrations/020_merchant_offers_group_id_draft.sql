@@ -184,7 +184,7 @@ $group_merchant_index_contract$;
 DROP POLICY IF EXISTS offers_select ON public.merchant_offers;
 CREATE POLICY offers_select ON public.merchant_offers FOR SELECT USING (
     merchant_id = auth.uid()
-    OR public.is_admin()
+   
     OR EXISTS (
         SELECT 1 FROM public.demands AS demand
         WHERE demand.id = merchant_offers.demand_id

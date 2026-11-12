@@ -4,5 +4,5 @@ DROP POLICY IF EXISTS merchant_profiles_select ON public.merchant_profiles;
 CREATE POLICY merchant_profiles_select ON public.merchant_profiles
 FOR SELECT USING (
     id = auth.uid()
-    OR public.is_admin()
+   
 );

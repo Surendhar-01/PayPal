@@ -178,7 +178,7 @@ def get_current_user(
 
     profile = getattr(profile_res, "data", None)
     role = profile.get("role") if isinstance(profile, dict) else None
-    if role not in {"customer", "merchant", "admin"}:
+    if role not in {"customer", "merchant"}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="A valid account role could not be verified.",
@@ -224,7 +224,7 @@ def require_roles(*allowed_roles: str):
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Role '{role}' is not permitted for this operation.",
             )
-        if current_user.get("email_confirmed_at") is None and role != "admin":
+        if current_user.get("email_confirmed_at") is None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Email address is not verified.",

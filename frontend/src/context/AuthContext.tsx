@@ -9,7 +9,7 @@ import React, {
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../services/supabase';
 
-export type AppRole = 'customer' | 'merchant' | 'admin';
+export type AppRole = 'customer' | 'merchant';
 
 export interface CustomerProfile {
   taxId: string | null;
@@ -68,7 +68,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 const isAppRole = (role: unknown): role is AppRole =>
-  role === 'customer' || role === 'merchant' || role === 'admin';
+  role === 'customer' || role === 'merchant';
 
 const metadataString = (user: User, ...keys: string[]): string | null => {
   for (const key of keys) {

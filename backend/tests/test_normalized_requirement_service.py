@@ -60,7 +60,7 @@ def test_review_normalized_advances_normalized_snapshot_timestamp(monkeypatch):
 
     saved = normalized_requirement_service.review_normalized(
         "requirement-1",
-        "admin-1",
+        "customer-1",
         {"normalized_material": "steel"},
     )
 

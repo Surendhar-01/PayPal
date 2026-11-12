@@ -508,7 +508,7 @@ def approve_merge_request(
     approved_by: str,
     client: Any = None,
 ) -> dict[str, Any]:
-    """Record explicit administrator approval without executing the merge."""
+    """Record explicit approval without executing the merge."""
     if client is None:
         client = get_supabase_service_client()
     if client is None:

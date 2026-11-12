@@ -33,7 +33,7 @@ $$;
 
 DROP POLICY IF EXISTS demands_select ON public.demands;
 CREATE POLICY demands_select ON public.demands
-    FOR SELECT USING (customer_id = auth.uid() OR public.is_admin());
+    FOR SELECT USING (customer_id = auth.uid());
 
 DROP POLICY IF EXISTS demand_requirements_select ON public.demand_requirements;
 CREATE POLICY demand_requirements_select ON public.demand_requirements

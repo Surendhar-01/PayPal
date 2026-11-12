@@ -137,7 +137,7 @@ WITH expected_policies AS (
         (
             'offers_select'::TEXT,
             'SELECT'::TEXT,
-            '(merchant_id = auth.uid()) OR public.is_admin() OR EXISTS '
+            '(merchant_id = auth.uid()) OR EXISTS '
                 || '(SELECT 1 FROM public.demands d WHERE d.id = merchant_offers.demand_id '
                 || 'AND d.customer_id = auth.uid())',
             NULL::TEXT
@@ -146,18 +146,18 @@ WITH expected_policies AS (
             'offers_insert'::TEXT,
             'INSERT'::TEXT,
             NULL::TEXT,
-            '(merchant_id = auth.uid()) OR public.is_admin()'
+            '(merchant_id = auth.uid())'
         ),
         (
             'offers_update'::TEXT,
             'UPDATE'::TEXT,
-            '(merchant_id = auth.uid()) OR public.is_admin()',
-            '(merchant_id = auth.uid()) OR public.is_admin()'
+            '(merchant_id = auth.uid())',
+            '(merchant_id = auth.uid())'
         ),
         (
             'offers_delete'::TEXT,
             'DELETE'::TEXT,
-            '(merchant_id = auth.uid()) OR public.is_admin()',
+            '(merchant_id = auth.uid())',
             NULL::TEXT
         )
     ) AS expected(policyname, expected_command, expected_using, expected_check)

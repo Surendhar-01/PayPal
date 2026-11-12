@@ -14,10 +14,7 @@ MarketTwin is a demand-driven marketplace where buyers aggregate purchasing inte
    - Submits competitive offers.
    - Fulfills approved orders.
 
-3. **Admin**
-   - Platform governance, category management, demand oversight.
-   - Merchant accreditation and dispute resolution.
-   - Analytics across demands, offers, and transactions.
+Only Customer and Merchant roles remain on the platform.
 
 ## Technology Stack
 
@@ -110,9 +107,6 @@ SUPABASE_KEY="your-anon-key"
 SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
 SUPABASE_JWT_SECRET="your-jwt-secret"
 FRONTEND_URL="http://localhost:5173"
-
-ADMIN_EMAIL="admin@markettwin.com"
-ADMIN_PASSWORD="your-secure-admin-password"
 
 GROQ_API_KEY="your-groq-api-key"
 
@@ -291,8 +285,8 @@ the migration and controlled staging checks succeed.
 - Supabase Auth handles registration, login, password reset, and sessions.
 - Frontend uses only the anon key.
 - Backend verifies JWTs and enforces roles.
-- Admin accounts are provisioned securely through backend-controlled processes.
 - Role-based route protection is enforced in frontend and backend.
+- Only Customer and Merchant roles are supported; no Admin accounts or routes remain.
 
 ## Core Features
 
@@ -304,7 +298,6 @@ the migration and controlled staging checks succeed.
 - Offer validation and customer selection
 - Order creation and PayPal payment foundation
 - Order fulfillment and delivery tracking
-- Admin governance and analytics
 
 ## Security
 

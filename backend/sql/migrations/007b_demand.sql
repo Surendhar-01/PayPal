@@ -34,7 +34,7 @@ ALTER TABLE public.demand_attachments ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS demand_attachments_select ON public.demand_attachments;
 CREATE POLICY demand_attachments_select ON public.demand_attachments FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.demands d WHERE d.id = demand_attachments.demand_id AND (d.customer_id = auth.uid() OR public.is_admin()))
+    EXISTS (SELECT 1 FROM public.demands d WHERE d.id = demand_attachments.demand_id AND (d.customer_id = auth.uid()))
 );
 
 DROP POLICY IF EXISTS demand_attachments_insert ON public.demand_attachments;

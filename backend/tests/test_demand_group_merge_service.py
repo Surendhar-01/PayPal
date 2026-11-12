@@ -276,7 +276,7 @@ def test_proposal_and_approval_are_separate_explicit_rpc_calls():
 
     proposal = create_merge_request(
         plan,
-        "admin-1",
+        "customer-1",
         client=client,
         compatibility_report={
             "status": "compatible",
@@ -292,7 +292,7 @@ def test_proposal_and_approval_are_separate_explicit_rpc_calls():
             ],
         },
     )
-    approval = approve_merge_request("request-1", "admin-2", client=client)
+    approval = approve_merge_request("request-1", "customer-2", client=client)
 
     assert proposal["request_status"] == "proposed"
     assert approval["request_status"] == "proposed"
@@ -345,7 +345,7 @@ def test_revised_snapshot_gets_a_new_stable_proposal_idempotency_key():
     ]
 
     for report in reports:
-        create_merge_request(plan, "admin-1", client=client, compatibility_report=report)
+        create_merge_request(plan, "customer-1", client=client, compatibility_report=report)
 
     keys = [params["p_idempotency_key"] for _, params in client.calls]
     assert keys[0] != keys[1]

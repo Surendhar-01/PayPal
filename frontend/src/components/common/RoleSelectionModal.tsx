@@ -1,10 +1,6 @@
 import React from 'react';
 import { Card, Modal, Typography } from 'antd';
-import {
-  ArrowRightOutlined,
-  ShopOutlined,
-  UserOutlined,
-} from '@ant-design/icons';
+import { ArrowRightOutlined, ShopOutlined, UserOutlined } from '@ant-design/icons';
 import type { AppRole } from '../../context/AuthContext';
 import './RoleSelectionModal.css';
 
@@ -39,11 +35,7 @@ const roles: Array<{
   },
 ];
 
-const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
-  open,
-  onClose,
-  onSelectRole,
-}) => (
+const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({ open, onClose, onSelectRole }) => (
   <Modal
     className="role-selection-modal"
     open={open}
@@ -67,8 +59,10 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
           <Card
             key={role}
             className="role-selection-card"
+            hoverable
             role="button"
             tabIndex={0}
+            aria-disabled={false}
             onClick={() => onSelectRole(role)}
             onKeyDown={(event) => {
               if (event.key === 'Enter' || event.key === ' ') {

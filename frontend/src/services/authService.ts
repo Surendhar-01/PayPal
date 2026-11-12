@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 
-export type AppRole = 'customer' | 'merchant' | 'admin';
+export type AppRole = 'customer' | 'merchant';
 
 export interface SignUpPayload {
   email: string;
